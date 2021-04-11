@@ -1,0 +1,26 @@
+{
+  "name": "push-to-ECR",
+  "version": "1.0.0",
+  "description": "push image to configured ECR repositories with configured tags.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/365Scores/push-to-ECR.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/365Scores/push-to-ECR/issues"
+  },
+  "homepage": "https://github.com/365Scores/push-to-ECR#readme",
+  "dependencies": {
+    "@actions/core": "^1.2.6",
+    "@aws-sdk/client-ecr": "^3.12.0",
+    "fs": "0.0.1-security",
+    "yaml": "^1.10.2"
+  }
+}

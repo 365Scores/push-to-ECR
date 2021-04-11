@@ -1,0 +1,12 @@
+name: 'Push to ECR'
+description: 'push image to ECR targets'
+inputs:
+  env-key:
+    description: 'environemnt key'
+    required: true
+  local-image:
+    description: 'local image (<name>:<tag>)'
+    required: true
+runs:
+  using: 'node12'
+  main: 'index.js'
