@@ -7,6 +7,28 @@ const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
 // inputs
 const env_key = CORE.getInput('env-key');
 const local_image = CORE.getInput('local-image');
+const extra_tags = readExtraTags();
+
+function readExtraTags() {
+	var input = CORE.getInput('extra-tags');
+	var obj = {};
+	if (input) {
+		var KVPs = input.split(',');
+		KVPs.forEach(function(kvp) {
+			var parts = kvp.split('=');
+			if (parts.length != 2) {
+				throw 'malformed input: extra-tags.'
+			}
+			const key = parts[0];
+			const value = parts[1];
+			if (key in obj) {
+				throw `extra-tags has duplicate key: ${key}.`
+			}
+			obj[key] = value;
+		});
+	}
+	return obj;
+}
 
 async function pushToECR(target) {
   try {
@@ -29,6 +51,16 @@ async function pushToECR(target) {
 	if (!tag) {
 		CORE.setFailed(`ECR push target is missing ecr-tag`);
 		error = true;
+	}
+	if (tag.startsWith('$$')) {
+		var input_tag = extra_tags[tag.substring(2)];
+		if (input_tag) {
+			tag = input_tag;
+		}
+		else {
+			CORE.setFailed(`ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`);
+			error = true;
+		}
 	}
 	if (forcePush !== undefined && forcePush !== true && forcePush !== false) {
 		CORE.setFailed(`ECR push target has invalid value for force-push. Either omit this property or set it to one of the valid values: [true, false]`);

@@ -7,6 +7,9 @@ inputs:
   local-image:
     description: 'local image (<name>:<tag>)'
     required: true
+  extra-tags:
+    description: 'pass values from the workflow to be used as tags'
+    required: false
 runs:
   using: 'node12'
   main: 'index.js'
