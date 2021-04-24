@@ -46,6 +46,15 @@ async function pushToECR(target) {
 	const onlyOnBuild = target['only-on-build'];
 	let error = false;
 	
+	if (actionTrigger !== ActionTriggersEnum.build && onlyOnBuild !== undefined && onlyOnBuild !== true && onlyOnBuild !== false) {
+		CORE.setFailed(`ECR push target has invalid value for only-on-build. Either omit this property or set it to one of the valid values: [true, false]`);
+		return;
+	}
+	if (onlyOnBuild && actionTrigger !== ActionTriggersEnum.build) {
+		console.log(`skip ECR push target '${registry}/${repository}:${tag}': tag is set to only-on-build`);
+		return;
+	}
+	
 	if (!registry) {
 		CORE.setFailed(`ECR push target is missing ecr-registry`);
 		error = true;
@@ -76,18 +85,9 @@ async function pushToECR(target) {
 		CORE.setFailed(`ECR push target has invalid value for continue-on-error. Either omit this property or set it to one of the valid values: [true, false]`);
 		error = true;
 	}
-	if (actionTrigger !== ActionTriggersEnum.build && onlyOnBuild !== undefined && onlyOnBuild !== true && onlyOnBuild !== false) {
-		CORE.setFailed(`ECR push target has invalid value for only-on-build. Either omit this property or set it to one of the valid values: [true, false]`);
-		error = true;
-	}
 	if (error) { return; }
 	
-	const newImage = `${registry}/${repository}:${tag}`;
-	
-	if (onlyOnBuild && actionTrigger !== ActionTriggersEnum.build) {
-		console.log(`skip ECR push target ${newImage}: tag is set to only-on-build`);
-		return;
-	}
+	const newImage = `'${registry}/${repository}:${tag}'`;
 	
 	try {
 		await execAsync(`docker image tag ${local_image} ${newImage}`);
