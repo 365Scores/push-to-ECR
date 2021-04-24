@@ -6,7 +6,10 @@ inputs:
     required: true
   local-image:
     description: 'local image (<name>:<tag>)'
-    required: true
+    required: false
+  remote-image:
+    description: 'remote image (<accountId>.dkr.ecr.<region>.amazonaws.com/<name>:<tag>)'
+    required: false
   extra-tags:
     description: 'pass values from the workflow to be used as tags'
     required: false
