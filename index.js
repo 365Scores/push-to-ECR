@@ -6,8 +6,13 @@ const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
 
 // inputs
 const env_key = CORE.getInput('env-key');
-const local_image = CORE.getInput('local-image');
+var local_image = CORE.getInput('local-image');
+const remote_image = CORE.getInput('remote-image');
 const extra_tags = readExtraTags();
+
+//global vars
+const ActionTriggersEnum = Object.freeze({"build":1, "retag":2});
+var actionTrigger = ActionTriggersEnum.build;
 
 function readExtraTags() {
 	var input = CORE.getInput('extra-tags');
@@ -38,6 +43,7 @@ async function pushToECR(target) {
 	var tag = target['ecr-tag'];
 	var forcePush = target['force-push'];
 	var continueOnError = target['continue-on-error'];
+	var onlyOnBuild = target['only-on-build'];
 	var error = false;
 	
 	if (!registry) {
@@ -70,9 +76,18 @@ async function pushToECR(target) {
 		CORE.setFailed(`ECR push target has invalid value for continue-on-error. Either omit this property or set it to one of the valid values: [true, false]`);
 		error = true;
 	}
+	if (actionTrigger !== ActionTriggersEnum.build && onlyOnBuild !== undefined && onlyOnBuild !== true && onlyOnBuild !== false) {
+		CORE.setFailed(`ECR push target has invalid value for only-on-build. Either omit this property or set it to one of the valid values: [true, false]`);
+		error = true;
+	}
 	if (error) { return; }
 	
 	var newImage = `${registry}/${repository}:${tag}`;
+	
+	if (onlyOnBuild && actionTrigger !== ActionTriggersEnum.build) {
+		console.log(`skip ECR push target ${newImage}: tag is set to only-on-build`);
+		return;
+	}
 	
 	try {
 		var shellResult = await execAsync(`docker image tag ${local_image} ${newImage}`);
@@ -108,7 +123,7 @@ async function pushToECR(target) {
 	}
 	
 	try {
-		var shellResult = await execAsync(`docker push ${newImage}`);
+		var shellResult = await execAsync(`docker image push ${newImage}`);
 		console.log(`push ${newImage}: success`);
 	}
 	catch (error) {
@@ -138,6 +153,28 @@ async function main() {
   try {
 	
     //console.log(`env_key ${env_key}, spot_io_token ${spot_io_token}`);
+	
+	if (local_image && remote_image) {
+		CORE.setFailed("this action requires only 1 of the following inputs: local-image, remote-image");
+		return;
+	}
+	
+	if (!local_image && !remote_image) {
+		CORE.setFailed("this action requires 1 of the following inputs: local-image, remote-image");
+		return;
+	}
+	
+	if (remote_image) {
+		actionTrigger = ActionTriggersEnum.retag;
+		local_image = "docker_image:temp";
+		
+		try { await execAsync(`docker image pull ${remote_image}`); }
+		catch { CORE.setFailed(`failed to pull docker image: ${remote_image}`); return; }
+		console.log(`pulled remote image ${remote_image}: success`);
+		
+		try { await execAsync(`docker image tag ${remote_image} ${local_image}`); }
+		catch (error) { CORE.setFailed(`tag ${local_image}: ${error}`); return; }
+	}
 	
 	const file = fs.readFileSync('.automation/deployment_envs.yaml', 'utf8');
 	var yamlObj = YAML.parse(file);

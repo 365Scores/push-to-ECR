@@ -9,7 +9,11 @@ push image to configured ECR repositories with configured tags.
 
 ### `local-image`
 
-**Required** local image to push (\<name\>:\<tag\>).
+**Optional** local image to push (\<name\>:\<tag\>).
+
+### `remote-image`
+
+**Optional** remote image to pull, tag & push (\<accountId\>.dkr.ecr.\<region\>.amazonaws.com/\<name\>:\<tag\>).
 
 ### `extra-tags`
 
@@ -45,6 +49,13 @@ envs:
       ecr-repository: other-repo
       ecr-tag: $$tag-from-workflow
       continue-on-error: true
+	  only-on-build: true
+      
+    - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
+      ecr-repository: other-repo
+      ecr-tag: $$build-num
+      continue-on-error: true
+	  only-on-build: true
 ```
 
 ### configurable properties for each ECR push target:
@@ -60,6 +71,10 @@ envs:
 ** This is achieved by deleting the tag from the repo just before pushing the image.
 
 `continue-on-error` - don't fail the pipeline because this image failed to be pushed. | **Optional** | **Default: false**
+
+`only-on-build` - push this tag only on new docker image build (not retag existing image). | **Optional** | **Default: false**
+
+** a retag is considered when using the 'remote-image' input.
 
 ## Example usage in a workflow
 
