@@ -90,7 +90,7 @@ async function pushToECR(target) {
 	}
 	
 	try {
-		const shellResult = await execAsync(`docker image tag ${local_image} ${newImage}`);
+		await execAsync(`docker image tag ${local_image} ${newImage}`);
 		console.log(`tag ${newImage}: success`);
 	}
 	catch (error) {
@@ -123,7 +123,7 @@ async function pushToECR(target) {
 	}
 	
 	try {
-		const shellResult = await execAsync(`docker image push ${newImage}`);
+		await execAsync(`docker image push ${newImage}`);
 		console.log(`push ${newImage}: success`);
 	}
 	catch (error) {
@@ -141,7 +141,6 @@ async function pushToECR(target) {
 function execAsync(command) {
     return new Promise((resolve, reject) => {	
 		exec(command, (error, stdout, stderr) => {
-			var errorMessage;
 			if (error) { reject(error); }
 			else if (stderr) { reject(stderr); }
 			else { resolve(stdout); }
