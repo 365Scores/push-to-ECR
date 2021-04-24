@@ -15,12 +15,12 @@ const ActionTriggersEnum = Object.freeze({"build":1, "retag":2});
 var actionTrigger = ActionTriggersEnum.build;
 
 function readExtraTags() {
-	var input = CORE.getInput('extra-tags');
-	var obj = {};
+	const input = CORE.getInput('extra-tags');
+	let obj = {};
 	if (input) {
-		var KVPs = input.split(',');
+		const KVPs = input.split(',');
 		KVPs.forEach(function(kvp) {
-			var parts = kvp.split('=');
+			const parts = kvp.split('=');
 			if (parts.length != 2) {
 				throw 'malformed input: extra-tags.'
 			}
@@ -38,13 +38,13 @@ function readExtraTags() {
 async function pushToECR(target) {
   try {
 	
-	var registry = target['ecr-registry'];
-	var repository = target['ecr-repository'];
-	var tag = target['ecr-tag'];
-	var forcePush = target['force-push'];
-	var continueOnError = target['continue-on-error'];
-	var onlyOnBuild = target['only-on-build'];
-	var error = false;
+	const registry = target['ecr-registry'];
+	const repository = target['ecr-repository'];
+	const tag = target['ecr-tag'];
+	const forcePush = target['force-push'];
+	const continueOnError = target['continue-on-error'];
+	const onlyOnBuild = target['only-on-build'];
+	let error = false;
 	
 	if (!registry) {
 		CORE.setFailed(`ECR push target is missing ecr-registry`);
@@ -59,7 +59,7 @@ async function pushToECR(target) {
 		error = true;
 	}
 	if (tag.startsWith('$$')) {
-		var input_tag = extra_tags[tag.substring(2)];
+		const input_tag = extra_tags[tag.substring(2)];
 		if (input_tag) {
 			tag = input_tag;
 		}
@@ -82,7 +82,7 @@ async function pushToECR(target) {
 	}
 	if (error) { return; }
 	
-	var newImage = `${registry}/${repository}:${tag}`;
+	const newImage = `${registry}/${repository}:${tag}`;
 	
 	if (onlyOnBuild && actionTrigger !== ActionTriggersEnum.build) {
 		console.log(`skip ECR push target ${newImage}: tag is set to only-on-build`);
@@ -90,24 +90,24 @@ async function pushToECR(target) {
 	}
 	
 	try {
-		var shellResult = await execAsync(`docker image tag ${local_image} ${newImage}`);
+		const shellResult = await execAsync(`docker image tag ${local_image} ${newImage}`);
 		console.log(`tag ${newImage}: success`);
 	}
 	catch (error) {
-		errorMessage = `tag ${newImage}: ${error}`;
+		const errorMessage = `tag ${newImage}: ${error}`;
 		if (continueOnError) { console.error(errorMessage); }
 		else { CORE.setFailed(errorMessage); }
 		return;
 	}
 	
 	if (forcePush) {
-		var ecr_client = new ECRClient();
+		const ecr_client = new ECRClient();
 		const ecr_response = await ecr_client.send(new BatchDeleteImageCommand({
 			repositoryName: repository,
 			imageIds: [{ imageTag: tag }]
 		}));
 		if (ecr_response && ecr_response.failures && ecr_response.failures.length > 0) {
-			var error = false;
+			let error = false;
 			ecr_response.failures.forEach(function(failure) {
 				if (failure.failureCode != 'ImageNotFound') {
 					error = true;
@@ -123,11 +123,11 @@ async function pushToECR(target) {
 	}
 	
 	try {
-		var shellResult = await execAsync(`docker image push ${newImage}`);
+		const shellResult = await execAsync(`docker image push ${newImage}`);
 		console.log(`push ${newImage}: success`);
 	}
 	catch (error) {
-		errorMessage = `push ${newImage}: ${error}`;
+		const errorMessage = `push ${newImage}: ${error}`;
 		if (continueOnError) { console.error(errorMessage); }
 		else { CORE.setFailed(errorMessage); }
 		return;
@@ -177,15 +177,15 @@ async function main() {
 	}
 	
 	const file = fs.readFileSync('.automation/deployment_envs.yaml', 'utf8');
-	var yamlObj = YAML.parse(file);
-	var envs = yamlObj['envs'];
-	var requested_env = envs[env_key];
+	const yamlObj = YAML.parse(file);
+	const envs = yamlObj['envs'];
+	const requested_env = envs[env_key];
 	if (!requested_env) {
 		CORE.setFailed(`requested env (${env_key}) is missing`);
 		return;
 	}
 	
-	var publishTargets = requested_env['publish-to'];
+	const publishTargets = requested_env['publish-to'];
 	if (publishTargets && publishTargets.length > 0) {
 		console.log(`${env_key} has ${publishTargets.length} ECR publish targets`);
 		publishTargets.forEach(pushToECR);
