@@ -49,13 +49,12 @@ envs:
       ecr-repository: other-repo
       ecr-tag: $$tag-from-workflow
       continue-on-error: true
-	  only-on-build: true
       
     - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
       ecr-repository: other-repo
       ecr-tag: $$build-num
       continue-on-error: true
-	  only-on-build: true
+      only-on-build: true
 ```
 
 ### configurable properties for each ECR push target:
