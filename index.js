@@ -73,7 +73,7 @@ async function pushToECR(target) {
 			tag = input_tag;
 		}
 		else {
-			CORE.setFailed(`ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`);
+			console.error(`warning: ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`);
 			error = true;
 		}
 	}
