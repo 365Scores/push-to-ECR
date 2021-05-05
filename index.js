@@ -40,7 +40,7 @@ async function pushToECR(target) {
 	
 	const registry = target['ecr-registry'];
 	const repository = target['ecr-repository'];
-	const tag = target['ecr-tag'];
+	let tag = target['ecr-tag'];
 	const forcePush = target['force-push'];
 	const continueOnError = target['continue-on-error'];
 	const onlyOnBuild = target['only-on-build'];
