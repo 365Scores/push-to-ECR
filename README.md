@@ -90,7 +90,12 @@ envs:
 
 ** a retag is considered when using the 'remote-image' input.
 
-`semantic-versioning` - push app versions according to semantic versioning. `ecr-tag` property must contain a version or refer to one ('1.2.6', 'v1.2.6', '$$version', '$$$app-version'). | **Optional** | **Default: false**
+`semantic-versioning` - push app versions according to semantic versioning. `ecr-tag` property must contain a version or refer to one (
+'1.2.6', 
+'v1.2.6', 
+'$$version', 
+'$$$app-version'
+) | **Optional** | **Default: false**
 
 ### `ecr-tag` reserved tags ('$$$' prefix):
 
