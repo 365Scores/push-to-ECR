@@ -128,19 +128,20 @@ async function pushToECR(target) {
 		CORE.setFailed(`ECR push target has invalid value for semantic-versioning. Either omit this property or set it to one of the valid values: [true, false]`);
 		error = true;
 	}
+	if (error) { return; }
+	  
 	if (semanticVersioning) {
 		try {
 			sm_versions = calc_sm_versions(tag);
 		} catch (sm_error) {
 			CORE.setFailed(`Error in calc_sm_versions().\n${sm_error}`);
-			error = true;
+			return;
 		}
 		if (sm_versions == null || !(sm_versions.length > 0)) {
 			CORE.setFailed(`Failed to calc_sm_versions(). got 0 results based on input ${tag} and 'ecr-tag' property ${target['ecr-tag']}`);
-			error = true;
+			return;
 		}
 	}
-	if (error) { return; }
 	
 	let targetProperties = {
 	  registry,
@@ -231,7 +232,7 @@ function execAsync(command) {
 }
 
 function handleError(errorMessage, continueOnError) {
-    if (continueOnError) { console.error(errorMessage); }
+	if (continueOnError) { console.warn(errorMessage); }
 	else { CORE.setFailed(errorMessage); }
 }
 
