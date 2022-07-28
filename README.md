@@ -108,5 +108,6 @@ uses: 365scores/push-to-ECR@v1
 with:
   env-key: 'qa'
   local-image: 'demo-docker-image'
-  extra-tags: 'tag-from-workflow=my-tag,app-version=${{ env.app_version }}'
+  app-version: '${{ env.app_version }}'
+  extra-tags: 'tag-from-workflow=my-tag,build-num=${{ github.run_number }}'
 ```
