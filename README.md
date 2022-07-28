@@ -61,6 +61,11 @@ envs:
       only-on-build: true
       
     - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
+      ecr-repository: other-repo
+      ecr-tag: $$commit-hash
+      unique-id: true
+      
+    - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
       ecr-repository: my-repo
       ecr-tag: $$$app-version
       continue-on-error: true
@@ -97,6 +102,8 @@ envs:
 '$$$app-version'
 ) | **Optional** | **Default: false**
 
+`unique-id` - can only be set on 1 target per environment. if an image is pushed to a deployment-env with a `unique-id` and that tag already exists remotely, retag the existing remote image instead of pushing the new one. | **Optional** | **Default: false**
+
 ### `ecr-tag` reserved tags ('$$$' prefix):
 
 `app-version` - takes the value from the optional `app-version` input. Can be used with `semantic-versioning` property.
@@ -109,5 +116,5 @@ with:
   env-key: 'qa'
   local-image: 'demo-docker-image'
   app-version: '${{ env.app_version }}'
-  extra-tags: 'tag-from-workflow=my-tag,build-num=${{ github.run_number }}'
+  extra-tags: 'tag-from-workflow=my-tag,build-num=${{ github.run_number }},commit-hash=${{ github.sha }}'
 ```
