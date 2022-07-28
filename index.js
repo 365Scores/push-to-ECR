@@ -3,7 +3,7 @@ const YAML = require('yaml');
 const fs = require('fs');
 const { exec } = require("child_process");
 const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
-const { readReservedTag } = require("./reservedTags");
+const { readReferenceTag } = require("./referenceTags");
 
 // inputs
 const env_key = CORE.getInput('env-key');
@@ -95,25 +95,12 @@ async function pushToECR(target) {
 		CORE.setFailed(`ECR push target is missing ecr-tag`);
 		error = true;
 	}
-	if (tag.startsWith('$$$')) {
-		const reserved_tag = tag.substring(3);
+	if (tag.startsWith('$$')) {
 		try {
-			tag = readReservedTag(reserved_tag);
-		} catch (reserved_tags_error) {
-			const errorMessage = `Failed to process reserved tag ${reserved_tag} of target ${JSON.stringify(target, null, 2)}. Error:\n${reserved_tags_error}`;
-			handleError(errorMessage, continueOnError !== false)
+			tag = readReferenceTag(tag, target);
+		} catch (reference_tags_error) {
+			handleError(reference_tags_error, continueOnError !== false)
 			error = true;			
-		}
-	}
-	else if (tag.startsWith('$$')) {
-		const input_tag = extra_tags[tag.substring(2)];
-		if (input_tag) {
-			tag = input_tag;
-		}
-		else {
-			const errorMessage = `warning: ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`;
-			handleError(errorMessage, continueOnError !== false)
-			error = true;
 		}
 	}
 	if (forcePush !== undefined && forcePush !== true && forcePush !== false) {
@@ -236,6 +223,58 @@ function handleError(errorMessage, continueOnError) {
 	else { CORE.setFailed(errorMessage); }
 }
 
+// image_to_retag must be a remote image
+async function prepareForRetag(image_to_retag) {
+	try { await execAsync(`docker image pull ${image_to_retag}`); }
+	catch { throw `failed to pull docker image: ${image_to_retag}`; }
+	console.log(`pulled remote image ${image_to_retag}: success`);
+
+	const local_image_temp = "docker_image:temp";
+	try { await execAsync(`docker image tag ${image_to_retag} ${local_image_temp}`); }
+	catch (error) { throw `tag ${local_image_temp}: ${error}`; }
+
+	local_image = local_image_temp;
+	actionTrigger = ActionTriggersEnum.retag;
+}
+
+async function prepareToRetagUnique(publishTargets) {
+	let uniqueTargets = publishTargets.filter(target => target['unique-id'] === true);
+	if (uniqueTargets.length > 0) {
+		if (uniqueTargets.length > 1) {
+			throw `there are ${uniqueTargets.length} unique targets. max number of allowed unique targets is 1.`
+				+ " Thus, it can't be a hard-coded value. please fix your '.automation/deployment_envs.yaml' file.";
+		}
+
+		const unique_target = uniqueTargets[0];
+		let unique_tag = unique_target['ecr-tag'];
+
+		if (!unique_tag.startsWith('$$')) {
+			throw "unique-id must be an idempotent tag that uniquely identifies the specific image, like a commit hash."
+				+ " Thus, it can't be a hard-coded value. please fix your '.automation/deployment_envs.yaml' file.";
+		}
+
+		// read unique tag, download remote image and set (actionTrigger = retag)
+		unique_tag = readReferenceTag(unique_tag, unique_target);
+		const remote_image_to_retag = `'${unique_target['ecr-registry']}/${unique_target['ecr-repository']}:${unique_tag}'`;
+		try {
+			await prepareForRetag(remote_image_to_retag);
+		} catch {
+			console.log("didn't find remote image to retag based on the unique-id. continue normally with (actionTrigger = build).");
+			return;
+		}
+
+		// remove target
+		const target_index = publishTargets.indexOf(unique_target);
+		if (target_index >= 0) {
+			publishTargets.splice(target_index, 1);
+		}
+		else {
+			throw "failed to remove the unique target from the publishTargets array."
+				+ " Please debug and fix.";
+		}
+	}
+}
+
 async function main() {
   try {
 	
@@ -252,15 +291,7 @@ async function main() {
 	}
 	
 	if (remote_image) {
-		actionTrigger = ActionTriggersEnum.retag;
-		local_image = "docker_image:temp";
-		
-		try { await execAsync(`docker image pull ${remote_image}`); }
-		catch { CORE.setFailed(`failed to pull docker image: ${remote_image}`); return; }
-		console.log(`pulled remote image ${remote_image}: success`);
-		
-		try { await execAsync(`docker image tag ${remote_image} ${local_image}`); }
-		catch (error) { CORE.setFailed(`tag ${local_image}: ${error}`); return; }
+		await prepareForRetag(remote_image);
 	}
 	
 	const file = fs.readFileSync('.automation/deployment_envs.yaml', 'utf8');
@@ -275,6 +306,12 @@ async function main() {
 	const publishTargets = requested_env['publish-to'];
 	if (publishTargets && publishTargets.length > 0) {
 		console.log(`${env_key} has ${publishTargets.length} ECR publish targets`);
+
+		// handle unique-id
+		if (actionTrigger != ActionTriggersEnum.retag) {
+			await prepareToRetagUnique(publishTargets)
+		}
+
 		publishTargets.forEach(pushToECR);
 	}
   }
