@@ -1,5 +1,28 @@
 const CORE = require('@actions/core');
 
+const extra_tags = readExtraTags();
+
+function readExtraTags() {
+	const input = CORE.getInput('extra-tags');
+	let obj = {};
+	if (input) {
+		const KVPs = input.split(',');
+		KVPs.forEach(function (kvp) {
+			const parts = kvp.split('=');
+			if (parts.length != 2) {
+				throw 'malformed input: extra-tags.'
+			}
+			const key = parts[0];
+			const value = parts[1];
+			if (key in obj) {
+				throw `extra-tags has duplicate key: ${key}.`
+			}
+			obj[key] = value;
+		});
+	}
+	return obj;
+}
+
 // read tag value by reference to extra-tags or reserved tags
 function readReferenceTag(tag, target) {
 

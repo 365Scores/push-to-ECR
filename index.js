@@ -9,32 +9,10 @@ const { readReferenceTag } = require("./referenceTags");
 const env_key = CORE.getInput('env-key');
 var local_image = CORE.getInput('local-image');
 const remote_image = CORE.getInput('remote-image');
-const extra_tags = readExtraTags();
 
 //global vars
 const ActionTriggersEnum = Object.freeze({"build":1, "retag":2});
 var actionTrigger = ActionTriggersEnum.build;
-
-function readExtraTags() {
-	const input = CORE.getInput('extra-tags');
-	let obj = {};
-	if (input) {
-		const KVPs = input.split(',');
-		KVPs.forEach(function(kvp) {
-			const parts = kvp.split('=');
-			if (parts.length != 2) {
-				throw 'malformed input: extra-tags.'
-			}
-			const key = parts[0];
-			const value = parts[1];
-			if (key in obj) {
-				throw `extra-tags has duplicate key: ${key}.`
-			}
-			obj[key] = value;
-		});
-	}
-	return obj;
-}
 
 // calc versions for "Semantic Versioning"
 // Example: version 1.2.6 => v1.2.6, v1.2, v1
