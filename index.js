@@ -3,6 +3,7 @@ const YAML = require('yaml');
 const fs = require('fs');
 const { exec } = require("child_process");
 const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
+const { readReservedTag } = require("./reservedTags");
 
 // inputs
 const env_key = CORE.getInput('env-key');
@@ -35,6 +36,31 @@ function readExtraTags() {
 	return obj;
 }
 
+// calc versions for "Semantic Versioning"
+// Example: version 1.2.6 => v1.2.6, v1.2, v1
+function calc_sm_versions(version) {
+
+	const trimVPrefix_re = /^[vV]?(?<cleaned>[\d]+([\d.]*\d+)?)$/;
+	const findVersion_re = /^[\d]+[\d.]*(?=[.]\d+$)/;
+
+	var versionCleaned = version.match(trimVPrefix_re);
+	if (versionCleaned)
+		version = versionCleaned.groups.cleaned;
+	else
+		throw `malformed version: ${version}.`
+
+	let sm_versions = [];
+	sm_versions.push(`v${version}`);
+
+	while ((re_matches = findVersion_re.exec(version)) !== null) {
+		let foundVersion = re_matches[0];
+		sm_versions.push(`v${foundVersion}`);
+		version = foundVersion;
+	}
+
+	return sm_versions;
+}
+
 async function pushToECR(target) {
   try {
 	
@@ -44,6 +70,8 @@ async function pushToECR(target) {
 	const forcePush = target['force-push'];
 	const continueOnError = target['continue-on-error'];
 	const onlyOnBuild = target['only-on-build'];
+	const semanticVersioning = target['semantic-versioning'];
+	let sm_versions = null;
 	let error = false;
 	
 	if (actionTrigger !== ActionTriggersEnum.build && onlyOnBuild !== undefined && onlyOnBuild !== true && onlyOnBuild !== false) {
@@ -67,13 +95,24 @@ async function pushToECR(target) {
 		CORE.setFailed(`ECR push target is missing ecr-tag`);
 		error = true;
 	}
-	if (tag.startsWith('$$')) {
+	if (tag.startsWith('$$$')) {
+		const reserved_tag = tag.substring(3);
+		try {
+			tag = readReservedTag(reserved_tag);
+		} catch (reserved_tags_error) {
+			const errorMessage = `Failed to process reserved tag ${reserved_tag} of target ${JSON.stringify(target, null, 2)}. Error:\n${reserved_tags_error}`;
+			handleError(errorMessage, continueOnError !== false)
+			error = true;			
+		}
+	}
+	else if (tag.startsWith('$$')) {
 		const input_tag = extra_tags[tag.substring(2)];
 		if (input_tag) {
 			tag = input_tag;
 		}
 		else {
-			console.error(`warning: ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`);
+			const errorMessage = `warning: ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`;
+			handleError(errorMessage, continueOnError !== false)
 			error = true;
 		}
 	}
@@ -85,9 +124,55 @@ async function pushToECR(target) {
 		CORE.setFailed(`ECR push target has invalid value for continue-on-error. Either omit this property or set it to one of the valid values: [true, false]`);
 		error = true;
 	}
+	if (semanticVersioning !== undefined && semanticVersioning !== true && semanticVersioning !== false) {
+		CORE.setFailed(`ECR push target has invalid value for semantic-versioning. Either omit this property or set it to one of the valid values: [true, false]`);
+		error = true;
+	}
 	if (error) { return; }
+	  
+	if (semanticVersioning) {
+		try {
+			sm_versions = calc_sm_versions(tag);
+		} catch (sm_error) {
+			CORE.setFailed(`Error in calc_sm_versions().\n${sm_error}`);
+			return;
+		}
+		if (sm_versions == null || !(sm_versions.length > 0)) {
+			CORE.setFailed(`Failed to calc_sm_versions(). got 0 results based on input ${tag} and 'ecr-tag' property ${target['ecr-tag']}`);
+			return;
+		}
+	}
 	
-	const newImage = `'${registry}/${repository}:${tag}'`;
+	let targetProperties = {
+	  registry,
+	  repository,
+	  tag,
+	  forcePush,
+	  continueOnError
+	}
+
+	if (semanticVersioning) {
+		for (const version of sm_versions) {
+			targetProperties.tag = version;
+			await pushTag(targetProperties);
+			
+			// forcePush = true (for derived versions)
+			targetProperties = { ...targetProperties };
+			targetProperties.forcePush = true;
+		}
+		return;
+	}
+
+	await pushTag(targetProperties);
+  }
+  catch (error) {
+    CORE.setFailed(error);
+  }
+}
+
+async function pushTag(targetProps) {
+  try {
+	  const newImage = `'${targetProps.registry}/${targetProps.repository}:${targetProps.tag}'`;
 	
 	try {
 		await execAsync(`docker image tag ${local_image} ${newImage}`);
@@ -95,16 +180,15 @@ async function pushToECR(target) {
 	}
 	catch (error) {
 		const errorMessage = `tag ${newImage}: ${error}`;
-		if (continueOnError) { console.error(errorMessage); }
-		else { CORE.setFailed(errorMessage); }
+		handleError(errorMessage, targetProps.continueOnError);
 		return;
 	}
 	
-	if (forcePush) {
+	if (targetProps.forcePush) {
 		const ecr_client = new ECRClient();
 		const ecr_response = await ecr_client.send(new BatchDeleteImageCommand({
-			repositoryName: repository,
-			imageIds: [{ imageTag: tag }]
+			repositoryName: targetProps.repository,
+			imageIds: [{ imageTag: targetProps.tag }]
 		}));
 		if (ecr_response && ecr_response.failures && ecr_response.failures.length > 0) {
 			let error = false;
@@ -128,8 +212,7 @@ async function pushToECR(target) {
 	}
 	catch (error) {
 		const errorMessage = `push ${newImage}: ${error}`;
-		if (continueOnError) { console.error(errorMessage); }
-		else { CORE.setFailed(errorMessage); }
+		handleError(errorMessage, targetProps.continueOnError);
 		return;
 	}
   }
@@ -146,6 +229,11 @@ function execAsync(command) {
 			else { resolve(stdout); }
 		});
     });
+}
+
+function handleError(errorMessage, continueOnError) {
+	if (continueOnError) { console.warn(errorMessage); }
+	else { CORE.setFailed(errorMessage); }
 }
 
 async function main() {
@@ -191,7 +279,7 @@ async function main() {
 	}
   }
   catch (error) {
-    CORE.setFailed(error.message);
+    CORE.setFailed(error);
   }
 }
 

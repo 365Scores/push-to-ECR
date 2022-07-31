@@ -10,6 +10,9 @@ inputs:
   remote-image:
     description: 'remote image (<accountId>.dkr.ecr.<region>.amazonaws.com/<name>:<tag>)'
     required: false
+  app-version:
+    description: 'version of the pushed image, made only from numbers and dots (ex. 1.2.6)'
+    required: false
   extra-tags:
     description: 'pass values from the workflow to be used as tags'
     required: false
