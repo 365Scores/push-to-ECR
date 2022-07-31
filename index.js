@@ -191,7 +191,7 @@ async function main() {
 	}
   }
   catch (error) {
-    CORE.setFailed(error.message);
+    CORE.setFailed(error);
   }
 }
 
