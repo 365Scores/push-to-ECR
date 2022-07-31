@@ -15,6 +15,10 @@ push image to configured ECR repositories with configured tags.
 
 **Optional** remote image to pull, tag & push (\<accountId\>.dkr.ecr.\<region\>.amazonaws.com/\<name\>:\<tag\>).
 
+### `app-version`
+
+**Optional** version of the pushed image, made only from numbers and dots (Examples: 1.2.6, 2.0, 2, 1.2.5.85.1).
+
 ### `extra-tags`
 
 **Optional** pass values from the workflow to be used as tags.
@@ -55,6 +59,22 @@ envs:
       ecr-tag: $$build-num
       continue-on-error: true
       only-on-build: true
+      
+    - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
+      ecr-repository: other-repo
+      ecr-tag: $$commit-hash
+      unique-id: true
+      
+    - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
+      ecr-repository: my-repo
+      ecr-tag: $$$app-version
+      continue-on-error: true
+      
+    - ecr-registry: 0123456789.dkr.ecr.us-east-1.amazonaws.com
+      ecr-repository: other-repo
+      ecr-tag: $$$app-version
+      continue-on-error: true
+      semantic-versioning: true
 ```
 
 ### configurable properties for each ECR push target:
@@ -63,7 +83,7 @@ envs:
 
 `ecr-repository` - Name of the ECR repository (docker image name). | **Required**
 
-`ecr-tag` - Tag to be pushed to the ECR repository (docker image tag). use '$$' prefix to take the tag from the `extra-tags` input | **Required**
+`ecr-tag` - Tag to be pushed to the ECR repository (docker image tag). use '$$' prefix to take the tag from the `extra-tags` input. use '$$$' prefix to use a reserved tag type (see list below) | **Required**
 
 `force-push` - Override existing tag (even if the repo is set to use immutable tags). | **Optional** | **Default: false**
 
@@ -75,6 +95,19 @@ envs:
 
 ** a retag is considered when using the 'remote-image' input.
 
+`semantic-versioning` - push app versions according to semantic versioning. `ecr-tag` property must contain a version or refer to one (
+'1.2.6', 
+'v1.2.6', 
+'$$version', 
+'$$$app-version'
+) | **Optional** | **Default: false**
+
+`unique-id` - can only be set on 1 target per environment. if an image is pushed to a deployment-env with a `unique-id` and that tag already exists remotely, retag the existing remote image instead of pushing the new one. | **Optional** | **Default: false**
+
+### `ecr-tag` reserved tags ('$$$' prefix):
+
+`app-version` - takes the value from the optional `app-version` input. Can be used with `semantic-versioning` property.
+
 ## Example usage in a workflow
 
 ```
@@ -82,5 +115,6 @@ uses: 365scores/push-to-ECR@v1
 with:
   env-key: 'qa'
   local-image: 'demo-docker-image'
-  extra-tags: 'tag-from-workflow=my-tag,app-version=${{ env.app_version }}'
+  app-version: '${{ env.app_version }}'
+  extra-tags: 'tag-from-workflow=my-tag,build-num=${{ github.run_number }},commit-hash=${{ github.sha }}'
 ```
