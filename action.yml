@@ -19,8 +19,8 @@ inputs:
     required: false
     default: false
     type: boolean
-  ecr-account: 
-    description: "AWS creds accounts type"
+  registry-id: 
+    description: "registry"
     required: false
     type: string
     default: CORP

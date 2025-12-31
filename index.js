@@ -9,7 +9,7 @@ var local_image = CORE.getInput('local-image');
 const remote_image = CORE.getInput('remote-image');
 const ecr_repository = CORE.getInput('ecr-repository');
 const force_push = CORE.getInput('force-push');
-const ecr_account = CORE.getInput('ecr-account');
+const registry_id = CORE.getInput('registry-id');
 const extra_tags = readExtraTags();
 
 //global vars
@@ -28,25 +28,41 @@ function readExtraTags() {
 	return tags.length > 0 ? tags : CORE.setFailed('No Extra Tags were provided');
 }
 
-async function pushToECR(target) {
+async function isRepositoryImmutable(repository_name) {
+	try {
+		const repo_name = repository_name
+
+		// Construct the full command string
+		// Note: We wrap repoName in quotes to be safe against spaces
+		const command = `aws ecr describe-repositories --repository-names "${repo_name}" --query 'repositories[0].imageTagMutability' --output text`;
+
+		// Use your helper function
+		const stdout = await execAsync(command);
+
+		// Process the result
+		const mutability = stdout.trim();
+
+		console.log(`Repository '${repo_name}' is: ${mutability}`);
+
+		// Write to GITHUB_ENV
+		fs.appendFileSync(process.env.GITHUB_ENV, `MUTABILITY=${mutability}\n`);
+		return mutability == "IMMUTABLE"
+
+	} catch (error) {
+		// Your helper rejects on error OR stderr, so we catch both here
+		core.setFailed(`Failed to check immutability: ${error}`);
+	}
+}
+
+async function pushToECR(tag_name, is_repository_immutable) {
 	try {
 
-		const registry = target['ecr-registry'];
-		const repository = target['ecr-repository'];
-		let tag = target['ecr-tag'];
-		const forcePush = target['force-push'];
-		const continueOnError = target['continue-on-error'];
-		const onlyOnBuild = target['only-on-build'];
+		const registry = registry_id;
+		const repository = ecr_repository
+		let tag = tag_name;
+		const forcePush = force_push
+		const is_repo_immutable = is_repository_immutable
 		let error = false;
-
-		if (actionTrigger !== ActionTriggersEnum.build && onlyOnBuild !== undefined && onlyOnBuild !== true && onlyOnBuild !== false) {
-			CORE.setFailed(`ECR push target has invalid value for only-on-build. Either omit this property or set it to one of the valid values: [true, false]`);
-			return;
-		}
-		if (onlyOnBuild && actionTrigger !== ActionTriggersEnum.build) {
-			console.log(`skip ECR push target '${registry}/${repository}:${tag}': tag is set to only-on-build`);
-			return;
-		}
 
 		if (!registry) {
 			CORE.setFailed(`ECR push target is missing ecr-registry`);
@@ -60,22 +76,8 @@ async function pushToECR(target) {
 			CORE.setFailed(`ECR push target is missing ecr-tag`);
 			error = true;
 		}
-		if (tag.startsWith('$$')) {
-			const input_tag = extra_tags[tag.substring(2)];
-			if (input_tag) {
-				tag = input_tag;
-			}
-			else {
-				console.error(`warning: ECR push target is missing ecr-tag. extra-tags is missing tag ${tag.substring(2)}.`);
-				error = true;
-			}
-		}
 		if (forcePush !== undefined && forcePush !== true && forcePush !== false) {
 			CORE.setFailed(`ECR push target has invalid value for force-push. Either omit this property or set it to one of the valid values: [true, false]`);
-			error = true;
-		}
-		if (continueOnError !== undefined && continueOnError !== true && continueOnError !== false) {
-			CORE.setFailed(`ECR push target has invalid value for continue-on-error. Either omit this property or set it to one of the valid values: [true, false]`);
 			error = true;
 		}
 		if (error) { return; }
@@ -93,7 +95,7 @@ async function pushToECR(target) {
 			return;
 		}
 
-		if (forcePush) {
+		if (forcePush && is_repo_immutable) {
 			const ecr_client = new ECRClient();
 			const ecr_response = await ecr_client.send(new BatchDeleteImageCommand({
 				repositoryName: repository,
@@ -168,22 +170,11 @@ async function main() {
 			catch (error) { CORE.setFailed(`tag ${local_image}: ${error}`); return; }
 		}
 
-		// const file = fs.readFileSync('.automation/deployment_envs.yaml', 'utf8');
-		// const yamlObj = YAML.parse(file);
-		// const envs = yamlObj['envs'];
-		// const requested_env = envs[env_key];
-		// if (!requested_env) {
-		// 	CORE.setFailed(`requested env (${env_key}) is missing`);
-		// 	return;
-		// }
 
-		// const publishTargets = requested_env['publish-to'];
-		// if (publishTargets && publishTargets.length > 0) {
-		// 	console.log(`${env_key} has ${publishTargets.length} ECR publish targets`);
-		// 	publishTargets.forEach(pushToECR);
-		// }
-
-		pushToECR()
+		const is_repo_immutable = await isRepositoryImmutable(ecr_repository)
+		extra_tags.forEach(tag => {
+			pushToECR(tag, is_repo_immutable, force_push)
+		})
 	}
 	catch (error) {
 		CORE.setFailed(error.message);
