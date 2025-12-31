@@ -5,9 +5,10 @@ const { exec } = require("child_process");
 const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
 
 // inputs
-const env_key = CORE.getInput('env-key');
 var local_image = CORE.getInput('local-image');
-const remote_image = CORE.getInput('remote-image');
+const ecr_repository = CORE.getInput('ecr-repository');
+const force_push = CORE.getInput('force-push');
+const ecr_account = CORE.getInput('ecr-account');
 const extra_tags = readExtraTags();
 
 //global vars
