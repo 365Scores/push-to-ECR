@@ -96,6 +96,7 @@ async function pushToECR(tag_name, is_repository_immutable) {
 		}
 
 		if (forcePush && is_repo_immutable) {
+			console.log(`Force Pushing: ${tag}`)
 			const ecr_client = new ECRClient();
 			const ecr_response = await ecr_client.send(new BatchDeleteImageCommand({
 				repositoryName: repository,
@@ -172,6 +173,7 @@ async function main() {
 
 
 		const is_repo_immutable = await isRepositoryImmutable(ecr_repository)
+		console.log(`Is repo immutable: ${is_repo_immutable}`)
 		extra_tags.forEach(tag => {
 			pushToECR(tag, is_repo_immutable, force_push)
 		})
