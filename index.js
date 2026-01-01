@@ -88,13 +88,11 @@ async function isTagExist(ecr_client, repositoryName, tag) {
 
 async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 	try {
-
 		const registry = registry_id;
 		const repository = ecr_repo
 		let tag = tag_name;
 		const is_repo_immutable = is_repository_immutable
 		let error = false;
-
 		if (!registry) {
 			CORE.setFailed(`ECR push target is missing ecr-registry`);
 			error = true;
@@ -110,15 +108,14 @@ async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 		if (error) { return; }
 
 		const newImage = `'${registry}/${repository}:${tag}'`;
-
+		console.log(`new tag to push: ${newImage}`);
 		try {
 			await execAsync(`docker image tag ${local_image} ${newImage}`);
 			console.log(`tag ${newImage}: success`);
 		}
 		catch (error) {
 			const errorMessage = `tag ${newImage}: ${error}`;
-			if (continueOnError) { console.error(errorMessage); }
-			else { CORE.setFailed(errorMessage); }
+			CORE.setFailed(errorMessage);
 			return;
 		}
 
@@ -154,8 +151,7 @@ async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 		}
 		catch (error) {
 			const errorMessage = `push ${newImage}: ${error}`;
-			if (continueOnError) { console.error(errorMessage); }
-			else { CORE.setFailed(errorMessage); }
+			CORE.setFailed(errorMessage);
 			return;
 		}
 	}
