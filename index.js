@@ -17,6 +17,7 @@ var actionTrigger = ActionTriggersEnum.build;
 
 function readExtraTags() {
 	const input = CORE.getInput('extra-tags');
+	console.log(`extra-tags: ${input}`)
 	let tags = [];
 	if (input) {
 		tags = input.split(',')           	// 1. Split by comma (prevents commas inside items)
@@ -116,7 +117,7 @@ async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 		catch (error) {
 			const errorMessage = `tag ${newImage}: ${error}`;
 			CORE.setFailed(errorMessage);
-			return;
+			throw new Error(errorMessage)
 		}
 
 		if (is_repo_immutable) {
@@ -198,6 +199,7 @@ async function main() {
 		}
 
 
+		console.log(`Local Image: ${local_image}`)
 		const is_repo_immutable = await isRepositoryImmutable(ecr_repository)
 		console.log(`Is repo immutable: ${is_repo_immutable}`)
 		if (is_repo_immutable !== undefined) {
