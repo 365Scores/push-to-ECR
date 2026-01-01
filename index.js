@@ -92,7 +92,6 @@ async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 		const registry = registry_id;
 		const repository = ecr_repo
 		let tag = tag_name;
-		const forcePush = force_push
 		const is_repo_immutable = is_repository_immutable
 		let error = false;
 
