@@ -2,7 +2,7 @@ const CORE = require('@actions/core');
 const YAML = require('yaml');
 const fs = require('fs');
 const { exec } = require("child_process");
-const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
+const { ECRClient, BatchDeleteImageCommand, DescribeImagesCommand } = require("@aws-sdk/client-ecr");
 
 // inputs
 var local_image = CORE.getInput('local-image');
@@ -16,11 +16,11 @@ const extra_tags = readExtraTags();
 const ActionTriggersEnum = Object.freeze({ "build": 1, "retag": 2 });
 var actionTrigger = ActionTriggersEnum.build;
 
-function defineForcePush() { 
+function defineForcePush() {
 	const input = CORE.getInput('force-push');
 	console.log("defineForcePush")
 	console.log(input)
-	console.log(typeof(input))
+	console.log(typeof (input))
 	return input == undefined ? false : input
 
 }
@@ -63,11 +63,43 @@ async function isRepositoryImmutable(repository_name) {
 	}
 }
 
-async function pushToECR(tag_name, is_repository_immutable) {
+/**
+ * Checks if a specific tag exists in the ECR repository using AWS SDK v3.
+ * * @param {string} repositoryName - The name of the ECR repository.
+ * @param {string} tag - The image tag to check.
+ * @returns {Promise<boolean>} - Returns true if the tag exists, false otherwise.
+ */
+async function isTagExist(ecr_client, repositoryName, tag) {
+	// Ideally, create the client once globally to reuse connections
+	const client = ecr_client
+
+	const command = new DescribeImagesCommand({
+		repositoryName: repositoryName,
+		imageIds: [{ imageTag: tag }]
+	});
+
+	try {
+		await client.send(command);
+		console.log(`Tag '${tag}' found in repo '${repositoryName}'.`);
+		return true;
+	} catch (error) {
+		// AWS SDK v3 throws this specific error name when an image isn't found
+		if (error.name === 'ImageNotFoundException') {
+			console.log(`Tag '${tag}' NOT found in repo '${repositoryName}'.`);
+			return false;
+		}
+
+		// Critical: Re-throw unexpected errors (AccessDenied, Throttling, etc.)
+		console.error(`[ERROR] Failed to check tag existence: ${error.message}`);
+		throw error;
+	}
+}
+
+async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 	try {
 
 		const registry = registry_id;
-		const repository = ecr_repository
+		const repository = ecr_repo
 		let tag = tag_name;
 		const forcePush = force_push
 		const is_repo_immutable = is_repository_immutable
@@ -107,24 +139,27 @@ async function pushToECR(tag_name, is_repository_immutable) {
 		if (forcePush && is_repo_immutable) {
 			console.log(`Force Pushing: ${tag}`)
 			const ecr_client = new ECRClient();
-			const ecr_response = await ecr_client.send(new BatchDeleteImageCommand({
-				repositoryName: repository,
-				imageIds: [{ imageTag: tag }]
-			}));
-			if (ecr_response && ecr_response.failures && ecr_response.failures.length > 0) {
-				let error = false;
-				ecr_response.failures.forEach(function (failure) {
-					if (failure.failureCode != 'ImageNotFound') {
-						error = true;
+			is_tag_exist = await isTagExist(ecr_client, repository, tag)
+			if (is_tag_exist) {
+				const ecr_response = await ecr_client.send(new BatchDeleteImageCommand({
+					repositoryName: repository,
+					imageIds: [{ imageTag: tag }]
+				}));
+				if (ecr_response && ecr_response.failures && ecr_response.failures.length > 0) {
+					let error = false;
+					ecr_response.failures.forEach(function (failure) {
+						if (failure.failureCode != 'ImageNotFound') {
+							error = true;
+						}
+					});
+					if (error) {
+						CORE.setFailed(`delete existing ECR tag ${newImage}: ${JSON.stringify(ecr_response, null, 2)}`);
+						return;
 					}
-				});
-				if (error) {
-					CORE.setFailed(`delete existing ECR tag ${newImage}: ${JSON.stringify(ecr_response, null, 2)}`);
-					return;
 				}
+				console.log(`ECR delete tag ${newImage} - Success`);
+				//console.log(ecr_response);
 			}
-			console.log(`ECR delete tag ${newImage} - Success`);
-			//console.log(ecr_response);
 		}
 
 		try {
@@ -185,7 +220,7 @@ async function main() {
 		console.log(`Is repo immutable: ${is_repo_immutable}`)
 		if (is_repo_immutable !== undefined) {
 			for (const tag of extra_tags) {
-				await pushToECR(tag, is_repo_immutable);
+				await pushToECR(tag,  ecr_repository, is_repo_immutable);
 			}
 		} else {
 			throw new Error("Error when getting repo immutablity")
