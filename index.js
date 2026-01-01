@@ -51,6 +51,7 @@ async function isRepositoryImmutable(repository_name) {
 	} catch (error) {
 		// Your helper rejects on error OR stderr, so we catch both here
 		CORE.setFailed(`Failed to check immutability: ${error}`);
+		return;
 	}
 }
 
@@ -174,8 +175,12 @@ async function main() {
 
 		const is_repo_immutable = await isRepositoryImmutable(ecr_repository)
 		console.log(`Is repo immutable: ${is_repo_immutable}`)
-		for (const tag of extra_tags) {
-			await pushToECR(tag, is_repo_immutable);
+		if (is_repo_immutable !== undefined) {
+			for (const tag of extra_tags) {
+				await pushToECR(tag, is_repo_immutable);
+			}
+		} else {
+			throw new Error("Error when getting repo immutablity")
 		}
 	}
 	catch (error) {
