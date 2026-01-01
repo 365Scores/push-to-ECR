@@ -50,7 +50,7 @@ async function isRepositoryImmutable(repository_name) {
 
 	} catch (error) {
 		// Your helper rejects on error OR stderr, so we catch both here
-		core.setFailed(`Failed to check immutability: ${error}`);
+		CORE.setFailed(`Failed to check immutability: ${error}`);
 	}
 }
 
