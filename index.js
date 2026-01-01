@@ -108,10 +108,6 @@ async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 			CORE.setFailed(`ECR push target is missing ecr-tag`);
 			error = true;
 		}
-		if (forcePush !== undefined && forcePush !== true && forcePush !== false) {
-			CORE.setFailed(`ECR push target has invalid value for force-push. Either omit this property or set it to one of the valid values: [true, false]`);
-			error = true;
-		}
 		if (error) { return; }
 
 		const newImage = `'${registry}/${repository}:${tag}'`;
