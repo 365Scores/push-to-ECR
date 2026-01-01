@@ -8,7 +8,7 @@ const { ECRClient, BatchDeleteImageCommand } = require("@aws-sdk/client-ecr");
 var local_image = CORE.getInput('local-image');
 const remote_image = CORE.getInput('remote-image');
 const ecr_repository = CORE.getInput('ecr-repository');
-const force_push = CORE.getInput('force-push');
+const force_push = defineForcePush()
 const registry_id = CORE.getInput('registry-id');
 const extra_tags = readExtraTags();
 
@@ -16,6 +16,14 @@ const extra_tags = readExtraTags();
 const ActionTriggersEnum = Object.freeze({ "build": 1, "retag": 2 });
 var actionTrigger = ActionTriggersEnum.build;
 
+function defineForcePush() { 
+	const input = CORE.getInput('force-push');
+	console.log("defineForcePush")
+	console.log(input)
+	console.log(typeof(input))
+	return input == undefined ? false : input
+
+}
 function readExtraTags() {
 	const input = CORE.getInput('extra-tags');
 	let tags = [];

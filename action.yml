@@ -17,7 +17,6 @@ inputs:
   force-push: 
     description: "Boolean value if to force push tags at immutable repository"
     required: false
-    default: false
     type: boolean
   registry-id: 
     description: "registry"
