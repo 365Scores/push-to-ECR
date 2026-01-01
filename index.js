@@ -174,9 +174,9 @@ async function main() {
 
 		const is_repo_immutable = await isRepositoryImmutable(ecr_repository)
 		console.log(`Is repo immutable: ${is_repo_immutable}`)
-		extra_tags.forEach(tag => {
-			pushToECR(tag, is_repo_immutable, force_push)
-		})
+		for (const tag of extra_tags) {
+			await pushToECR(tag, is_repo_immutable);
+		}
 	}
 	catch (error) {
 		CORE.setFailed(error.message);
