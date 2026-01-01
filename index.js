@@ -8,7 +8,6 @@ const { ECRClient, BatchDeleteImageCommand, DescribeImagesCommand } = require("@
 var local_image = CORE.getInput('local-image');
 const remote_image = CORE.getInput('remote-image');
 const ecr_repository = CORE.getInput('ecr-repository');
-const force_push = defineForcePush()
 const registry_id = CORE.getInput('registry-id');
 const extra_tags = readExtraTags();
 
@@ -16,14 +15,6 @@ const extra_tags = readExtraTags();
 const ActionTriggersEnum = Object.freeze({ "build": 1, "retag": 2 });
 var actionTrigger = ActionTriggersEnum.build;
 
-function defineForcePush() {
-	const input = CORE.getInput('force-push');
-	console.log("defineForcePush")
-	console.log(input)
-	console.log(typeof (input))
-	return input == undefined ? false : input
-
-}
 function readExtraTags() {
 	const input = CORE.getInput('extra-tags');
 	let tags = [];
@@ -136,7 +127,7 @@ async function pushToECR(tag_name, ecr_repo, is_repository_immutable) {
 			return;
 		}
 
-		if (forcePush && is_repo_immutable) {
+		if (is_repo_immutable) {
 			console.log(`Force Pushing: ${tag}`)
 			const ecr_client = new ECRClient();
 			is_tag_exist = await isTagExist(ecr_client, repository, tag)
@@ -220,7 +211,7 @@ async function main() {
 		console.log(`Is repo immutable: ${is_repo_immutable}`)
 		if (is_repo_immutable !== undefined) {
 			for (const tag of extra_tags) {
-				await pushToECR(tag,  ecr_repository, is_repo_immutable);
+				await pushToECR(tag, ecr_repository, is_repo_immutable);
 			}
 		} else {
 			throw new Error("Error when getting repo immutablity")

@@ -13,16 +13,9 @@ inputs:
   ecr-repository:
     description: "ECR repository name"
     required: true
-    type: string
-  force-push: 
-    description: "Boolean value if to force push tags at immutable repository"
-    required: false
-    type: boolean
   registry-id: 
     description: "registry"
     required: false
-    type: string
-    default: CORP
 runs:
   using: 'node12'
   main: 'index.js'
