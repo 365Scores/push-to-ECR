@@ -1,9 +1,6 @@
 name: 'Push to ECR'
 description: 'push image to ECR targets'
 inputs:
-  env-key:
-    description: 'environemnt key'
-    required: true
   local-image:
     description: 'local image (<name>:<tag>)'
     required: false
@@ -13,6 +10,12 @@ inputs:
   extra-tags:
     description: 'pass values from the workflow to be used as tags'
     required: false
+  ecr-repository:
+    description: "ECR repository name"
+    required: true
+  registry-id: 
+    description: "registry"
+    required: true
 runs:
   using: 'node12'
   main: 'index.js'
