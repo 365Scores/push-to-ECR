@@ -19,7 +19,7 @@
   "homepage": "https://github.com/365Scores/push-to-ECR#readme",
   "dependencies": {
     "@actions/core": "^1.2.6",
-    "@aws-sdk/client-ecr": "^3.12.0",
+    "@aws-sdk/client-ecr": "^3.350.0",
     "fs": "0.0.1-security",
     "yaml": "^1.10.2"
   }
